@@ -4,30 +4,34 @@
 #include <stdint.h>
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
+#include "hardware/gpio.h"
 
-// LCD configuration - set your GPIO pins here
-typedef struct {
-    uint8_t spi_inst;      // SPI instance (0 or 1)
-    uint8_t pin_cs;        // Chip Select pin
-    uint8_t pin_dc;        // Data/Command pin
-    uint8_t pin_reset;     // Reset pin
-    uint8_t pin_sck;       // SPI Clock pin
-    uint8_t pin_mosi;      // SPI MOSI pin
-    uint8_t pin_miso;      // SPI MISO pin (use 255 if not used)
-    uint32_t spi_baudrate; // SPI speed (try 8MHz or higher)
-} lcd_config_t;
+// LCD pin definitions - adjust these to match your hardware
+extern const int LCD_SPI_INST;     // SPI instance (0 or 1)
+extern const int LCD_PIN_CS;       // Chip Select
+extern const int LCD_PIN_DC;       // Data/Command
+extern const int LCD_PIN_RESET;    // Reset
+extern const int LCD_PIN_SCK;      // SPI Clock
+extern const int LCD_PIN_MOSI;     // SPI MOSI
 
-// Initialize LCD with SPI and reset sequence
-int lcd_init(const lcd_config_t *config);
+// Initialize LCD with SPI
+void lcd_init();
 
-// Send command byte to LCD
+// Send command byte
 void lcd_command(uint8_t cmd);
 
-// Send data byte to LCD
+// Send data byte
 void lcd_data(uint8_t data);
 
-// Fill screen with color (RGB565 format)
+// Clear screen with color (RGB565)
 void lcd_clear(uint16_t color);
 
-#endif
+// Display health data on screen
+void lcd_display_heart_rate(int heart_rate);
+void lcd_display_temperature(float temp);
+void lcd_display_steps(int steps);
 
+// Update entire display with all health data
+void lcd_update_display(int heart_rate, float temperature, int steps);
+
+#endif
