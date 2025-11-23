@@ -3,41 +3,51 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define SDA_PIN (26)
-#define SCL_PIN (27)
+#define SDA_PIN (16)
+#define SCL_PIN (17)
 
 void MAX30205_init_i2c()
 {
     // using I2C1 pin26 27
+    i2c_init(i2c0, 125000);
     gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
 
-    i2c_init(i2c1, 125000);
-    gpio_pull_up(SDA_PIN);
-    gpio_pull_up(SCL_PIN);
+    // gpio_pull_up(SDA_PIN);
+    // gpio_pull_up(SCL_PIN);
+
+    //test
+    gpio_set_function(22, GPIO_FUNC_SIO);
+    gpio_init(22);
+    gpio_set_dir(22, 1);
+    gpio_put(22, 1);
 }
 
 void MAX30205_check_address()
 {
     printf("scanning I2C bus for MAX30205...\n"); fflush(stdout);
-    
-    for (uint8_t addr = 0x08; addr < 0x7F; addr++)
-    {   
-        uint8_t reg=0x00;
-        i2c_write_blocking(i2c1, addr, &reg, 1, true);
 
-        uint8_t result;
-        int read = i2c_read_blocking(i2c1, addr, &result, 1, false);
-        if (read >= 0)
+    printf("   0 1 2 3 4 5 6 7 8 9 A B C D E F\n");fflush(stdout);
+    for (int addr = 0; addr < (1 << 7); ++addr) {
+        //printf("Scanning %d", addr); fflush(stdout);
+        if (addr % 16 == 0) {
+            printf("%02x ", addr);
+        }
+
+        int ret;
+        uint8_t rxdata;
+        uint8_t txdata=0;
+        i2c_write_blocking(i2c0, addr, &txdata, 1, true);
+        ret = i2c_read_blocking(i2c0, addr, &rxdata, 1, false);
+
+        if (ret<0)
         {
-            printf("I2C found at 0x%02X\n", addr); fflush(stdout);
-            sleep_ms(100);
-        } 
-        else
+            printf(".");fflush(stdout);
+        } else
         {
-            printf("Failed at 0x%X\r\n", addr); fflush(stdout);
-            sleep_ms(100);
-        } 
+            printf("@");fflush(stdout);
+        }
+        printf(addr % 16 == 15 ? "\n" : " ");fflush(stdout);
     }
-    printf("Scanning End...\n"); fflush(stdout);
+    printf("Done\n");fflush(stdout);
 }
