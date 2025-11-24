@@ -18,10 +18,13 @@ int main()
 
     #ifdef MAX30205_TEST
     MAX30205_init_i2c();
-    MAX30205_check_address();
+    //MAX30205_check_address();
 
     #endif
-
-    for(;;);    
+    for(;;)
+    {
+        float temp = read_temperature();
+        printf("Current temperature: %.2f     \r", temp);
+    }    
     return 0;
 }
