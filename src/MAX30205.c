@@ -59,7 +59,6 @@ float read_temperature()
     uint8_t buf[2];
     i2c_write_blocking(i2c0, addr, &txdata, 1, true);
     i2c_read_blocking(i2c0, addr, buf, 2, false);
-    printf("Read as 0x%02X   0x%02X    \r", buf[0], buf[1]);
 
     uint16_t raw_data = (uint16_t) (buf[0] << 8 | buf[1]);
     int signed_raw = (int16_t) raw_data;

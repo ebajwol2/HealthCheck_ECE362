@@ -24,7 +24,8 @@ int main()
     for(;;)
     {
         float temp = read_temperature();
-        printf("Current temperature: %.2f     \r", temp);
+        printf("Current temperature: %f     \r", temp);
+        sleep_ms(10);
     }    
     return 0;
 }
