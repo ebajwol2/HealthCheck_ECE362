@@ -2,6 +2,7 @@
 #include "hardware/i2c.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "MAX30205.h"
 
 #define SDA_PIN (16)
 #define SCL_PIN (17)
@@ -52,8 +53,10 @@ void MAX30205_check_address()
     printf("Done\n");fflush(stdout);
 }
 
-float read_temperature()
+void read_temperature()
 {
+    hw_clear_bits(&timer0_hw->intr, 1u << 0); // acknowledge timer
+
     int addr = 0x48;
     uint8_t txdata = 0;
     uint8_t buf[2];
@@ -62,8 +65,17 @@ float read_temperature()
 
     uint16_t raw_data = (uint16_t) (buf[0] << 8 | buf[1]);
     int signed_raw = (int16_t) raw_data;
-    float temp = signed_raw * 0.00390625f + 64.0f;
+    temperature = signed_raw * 0.00390625f + 64.0f;
 
-    return temp;
+    uint64_t quat_s = timer0_hw->timerawl + 250000;
+    timer0_hw->alarm[0] = (uint32_t) quat_s;
 }
 
+void MAX30205_init_timer()
+{
+    hw_set_bits(&timer0_hw->inte, 1u << 0); // interrupt enable for timer0 alarm0
+    irq_set_exclusive_handler(timer_hardware_alarm_get_irq_num(timer0_hw, 0), read_temperature);
+    irq_set_enabled(timer_hardware_alarm_get_irq_num(timer0_hw, 0), true);
+    uint64_t s1 = timer0_hw->timerawl + 1000000;
+    timer0_hw->alarm[0] = (uint32_t) s1;
+}

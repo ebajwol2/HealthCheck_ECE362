@@ -18,14 +18,12 @@ int main()
 
     #ifdef MAX30205_TEST
     MAX30205_init_i2c();
-    //MAX30205_check_address();
-
+    MAX30205_init_timer(); // use timer0 alarm0 ; delayed start 1s, update temperature every 0.25s
     #endif
+    
     for(;;)
     {
-        float temp = read_temperature();
-        printf("Current temperature: %f     \r", temp);
-        sleep_ms(10);
+        printf("Current temperature: %f     \r", temperature);
     }    
     return 0;
 }
