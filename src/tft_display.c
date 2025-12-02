@@ -3,6 +3,9 @@
 #include "hardware/spi.h"
 #include <stdio.h>
 #include "font5x7.h"
+#include "MAX30205.h"
+#include "ADX345.h"
+#include "MAX30102.h"
 
 // SPI1 pins
 #define LCD_SPI_INST spi0
@@ -139,7 +142,7 @@ static void lcd_text(int x, int y, const char *s, uint16_t fg, uint16_t bg) {
     }
 }
 
-// ===== Public functions =====
+// ===== General functions =====
 
 void tft_init() {
     spi_init(LCD_SPI_INST, 8000000);
@@ -236,13 +239,13 @@ void tft_show_heart(int bpm) {
 void tft_show_temp(float t) {
     tft_clear(0x001F);
     char b[32];
-    snprintf(b, sizeof(b), "Temp: %.1f C", t);
+    snprintf(b, sizeof(b), "Temp: %.1f C", temperature);
     lcd_text_large(30, 100, b, 0xFFFF, 0x001F);  // White on blue
 }
 
 void tft_show_steps(int s) {
     tft_clear(0x07E0);
     char b[32];
-    snprintf(b, sizeof(b), "Steps: %d", s);
+    snprintf(b, sizeof(b), "Steps: %d", accel_get_steps());
     lcd_text_large(40, 100, b, 0x0000, 0x07E0);  // Black on green
 }

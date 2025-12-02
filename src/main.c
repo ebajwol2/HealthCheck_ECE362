@@ -6,6 +6,9 @@
 #include "hardware/regs/pads_bank0.h"
 #include "hardware/regs/io_bank0.h"
 #include "tft_display.h"
+#include "MAX30205.h"
+#include "ADX345.h"
+#include "MAX30102.h"
 
 // Button + LED pins
 #define BUTTON_PIN 26
@@ -22,11 +25,11 @@ static volatile bool button_pressed = false;
 
 // Dummy sensor values
 static int heart_rate = 72;
-static float temperature = 36.5f;
+// static float temperature = 36.5f;
 static int steps = 1200;
 
 // ----------------------------
-// Render the current screen
+// screen
 // ----------------------------
 static void render() {
     switch (current_screen) {
@@ -67,7 +70,7 @@ static void button_isr(uint gpio, uint32_t events) {
 }
 
 // ----------------------------
-// Configure GPIO26 as a REAL high-Z input w/ pull-up
+// Configure GPIO26
 // ----------------------------
 static void configure_button_pin() {
     gpio_init(BUTTON_PIN);
@@ -80,7 +83,7 @@ static void configure_button_pin() {
     gpio_pull_up(BUTTON_PIN);
 
     // FIX HARDWARE PAD CONFIGURATION:
-    // Make GPIO26 a genuine input-only pin
+
     hw_write_masked(
         &pads_bank0_hw->io[BUTTON_PIN],
         PADS_BANK0_GPIO0_IE_BITS,            // Input enable bit
@@ -111,6 +114,10 @@ int main() {
 
     // TFT setup
     tft_init();
+    MAX30205_init_i2c();
+    MAX30205_init_timer();
+    accel_init();
+    max30102_init();
 
     // LED
     gpio_init(LED_PIN);
@@ -123,9 +130,11 @@ int main() {
     render();
 
     while (1) {
+        accel_update_steps();
+        uint32_t heart = max30102_read_red();
+       printf("Heart: %lu\n", heart);
         if (button_pressed) {
             button_pressed = false;
-
             current_screen = (current_screen + 1) % 3;
             printf("Screen changed to: %d\n", current_screen);
 
@@ -136,6 +145,6 @@ int main() {
             gpio_put(LED_PIN, 0);
         }
 
-        sleep_ms(20);
+        sleep_ms(10);
     }
 }
