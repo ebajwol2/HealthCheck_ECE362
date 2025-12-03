@@ -13,6 +13,10 @@
 // Button + LED pins
 #define BUTTON_PIN 26
 #define LED_PIN    25
+#define LED_R 37
+#define LED_G 38
+#define LED_B 39
+
 
 typedef enum { 
     SCREEN_HEART = 0, 
@@ -103,6 +107,75 @@ static void configure_button_pin() {
     );
 }
 
+
+// ----------------------------
+// Buzzer in LED
+// ----------------------------
+static void rgb_off() {
+    gpio_put(LED_R, 1);
+    gpio_put(LED_G, 1);
+    gpio_put(LED_B, 1);
+}
+
+static void rgb_red() {
+    gpio_put(LED_R, 0);
+    gpio_put(LED_G, 1);
+    gpio_put(LED_B, 1);
+}
+
+static void rgb_green() {
+    gpio_put(LED_R, 1);
+    gpio_put(LED_G, 0);
+    gpio_put(LED_B, 1);
+}
+
+static void rgb_blue() {
+    gpio_put(LED_R, 1);
+    gpio_put(LED_G, 1);
+    gpio_put(LED_B, 0);
+}
+
+static void rgb_yellow() {
+    gpio_put(LED_R, 0);
+    gpio_put(LED_G, 0);
+    gpio_put(LED_B, 1);
+}
+
+static void check_alarm() {
+    bool temp_alert  = (temperature > 28.0f);
+    bool heart_alert = (heart_rate > 120);
+
+    if (temp_alert && heart_alert) {
+        // RED-YELLOW rapid alert
+        rgb_red();
+        sleep_ms(40);
+        rgb_yellow();
+        sleep_ms(40);
+        return;
+    }
+
+    if (temp_alert) {
+        // Blue flash for fever
+        rgb_blue();
+        sleep_ms(60);
+        rgb_off();
+        sleep_ms(60);
+        return;
+    }
+
+    if (heart_alert) {
+        // Red heartbeat flashing pattern
+        rgb_red();
+        sleep_ms(80);
+        rgb_off();
+        sleep_ms(80);
+        return;
+    }
+
+    // Safe
+    rgb_off();
+}
+
 // ----------------------------
 // Main
 // ----------------------------
@@ -120,8 +193,18 @@ int main() {
     max30102_init();
 
     // LED
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
+    gpio_init(LED_R);
+    gpio_set_dir(LED_R, GPIO_OUT);
+    gpio_put(LED_R, 1);   // off (common anode)
+
+    gpio_init(LED_G);
+    gpio_set_dir(LED_G, GPIO_OUT);
+    gpio_put(LED_G, 1);
+
+    gpio_init(LED_B);
+    gpio_set_dir(LED_B, GPIO_OUT);
+    gpio_put(LED_B, 1);
+
 
     // Button
     configure_button_pin();
@@ -129,15 +212,29 @@ int main() {
     // Show first screen
     render();
 
+    uint64_t last_refresh = time_us_64();
+
     while (1) {
+        // Update accelerometer step count
         accel_update_steps();
-        uint32_t heart = max30102_read_red();
-       printf("Heart: %lu\n", heart);
+
+        // Read heart rate (raw)
+        uint32_t heart_raw = max30102_read_red();
+        heart_rate = heart_raw;  // You may refine later
+
+        uint64_t now = time_us_64();
+
+        // Refresh display every 20 ms = 20,000 µs
+        if (now - last_refresh >= 20000) {
+            last_refresh = now;
+            render();  // redraw current screen
+        }
+
+        // Button press then switch screen
         if (button_pressed) {
             button_pressed = false;
-            current_screen = (current_screen + 1) % 3;
-            printf("Screen changed to: %d\n", current_screen);
 
+            current_screen = (current_screen + 1) % 3;
             render();
 
             gpio_put(LED_PIN, 1);
@@ -145,6 +242,8 @@ int main() {
             gpio_put(LED_PIN, 0);
         }
 
-        sleep_ms(10);
-    }
+        // Buzzer
+        check_alarm();
+}
+
 }
