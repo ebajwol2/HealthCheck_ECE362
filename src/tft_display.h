@@ -6,7 +6,7 @@
 void tft_init();
 void tft_clear(uint16_t color);
 
-void tft_show_heart(int bpm);
+void tft_show_heart(int heart_rate);
 void tft_show_temp(float temp);
 void tft_show_steps(int steps);
 

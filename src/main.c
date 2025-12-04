@@ -28,10 +28,9 @@ static volatile screen_t current_screen = SCREEN_HEART;
 static volatile bool button_pressed = false;
 
 // Dummy sensor values
-static int heart_rate = 72;
 // static float temperature = 36.5f;
 static int steps = 1200;
-
+extern uint32_t heart_rate;
 // ----------------------------
 // screen
 // ----------------------------
@@ -219,13 +218,12 @@ int main() {
         accel_update_steps();
 
         // Read heart rate (raw)
-        uint32_t heart_raw = max30102_read_red();
-        heart_rate = heart_raw;  // You may refine later
+        max30102_read_red();
 
         uint64_t now = time_us_64();
 
         // Refresh display every 20 ms = 20,000 µs
-        if (now - last_refresh >= 20000) {
+        if (now - last_refresh >= 200000) {
             last_refresh = now;
             render();  // redraw current screen
         }

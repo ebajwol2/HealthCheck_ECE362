@@ -14,6 +14,7 @@
 #define LCD_PIN_RESET  21
 #define LCD_PIN_SCK    18
 #define LCD_PIN_MOSI   19
+extern uint32_t heart_rate;
 
 // ===== Helpers =====
 static void lcd_cs(int s) { gpio_put(LCD_PIN_CS, s ? 0 : 1); }
@@ -229,10 +230,10 @@ void tft_clear(uint16_t color) {
     lcd_fill(color);
 }
 
-void tft_show_heart(int bpm) {
+void tft_show_heart(int h) {
     tft_clear(0x0000);
     char b[32];
-    snprintf(b, sizeof(b), "Heart: %d BPM", bpm);
+    snprintf(b, sizeof(b), "Heart: %d heart_rate", heart_rate);
     lcd_text_large(20, 100, b, 0xF800, 0x0000);  // Red on black
 }
 

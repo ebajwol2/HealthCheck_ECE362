@@ -15,8 +15,3 @@
 #include "hardware/uart.h"
 #include "pico/rand.h"
 #include "hardware/i2c.h"
-
-void max30102_init();
-uint32_t max30102_read_red();
-
-
