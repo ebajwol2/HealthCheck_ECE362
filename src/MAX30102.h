@@ -15,3 +15,4 @@
 #include "hardware/uart.h"
 #include "pico/rand.h"
 #include "hardware/i2c.h"
+uint32_t heart_rate = 0;
