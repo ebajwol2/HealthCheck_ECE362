@@ -41,19 +41,12 @@ void accel_init() {
 
     uint8_t id = 0;
     adxl_read(0x00, &id, 1);
-    printf("Initialize = 0x%02X\n", id);
-
-    printf("Configuring\n");
-
     adxl_write(REG_POWER_CTL, 0x00);  
     sleep_ms(10);
-
     adxl_write(REG_DATA_FORMAT, 0x0B); 
     adxl_write(REG_BW_RATE, 0x0A);   
 
     adxl_write(REG_POWER_CTL, 0x08); 
-
-    printf("Measurement mode\n");
 }
 
 float accel_read_magnitude() {
@@ -65,9 +58,6 @@ float accel_read_magnitude() {
     float xf = (float)x * 0.0039f;
     float yf = (float)y * 0.0039f;
     float mag = sqrtf(xf * xf + yf * yf);
-
-    printf("X =%d  Y =%d   MAG=%.3f g\n", x, y, mag);
-
     return mag;
 }
 
@@ -81,7 +71,6 @@ void accel_update_steps() {
 
     if (diff > 0.25f && diff < 3.0f) {
         step_count++;
-        printf("Step detected, Total Steps = %d\n", step_count );
         sleep_ms(200);
     }
 
