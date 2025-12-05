@@ -1,183 +1,81 @@
-#include "max30102.h"
-#include <stdbool.h>
-#include <stdint.h>
+#include "pico/stdlib.h"
+#include "hardware/i2c.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include "MAX30205.h"
 
-const int I2C_SDA = 32;
-const int I2C_SCL = 33; 
-const uint8_t SENSOR_ADDRESS = 0x57;
+#define SDA_PIN (16)
+#define SCL_PIN (17)
 
-uint32_t sample = 0;
+void MAX30205_init_i2c()
+{
+    // using I2C1 pin26 27
+    i2c_init(i2c0, 125000);
+    gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
 
-// PBA algorithm variables
-int16_t IR_AC_Max = 20;
-int16_t IR_AC_Min = -20;
+    // gpio_pull_up(SDA_PIN);
+    // gpio_pull_up(SCL_PIN);
 
-int16_t IR_AC_Signal_Current = 0;
-int16_t IR_AC_Signal_Previous = 0;
-int16_t IR_AC_Signal_min = 0;
-int16_t IR_AC_Signal_max = 0;
-int16_t IR_Average_Estimated = 0;
-
-int16_t positiveEdge = 0;
-int16_t negativeEdge = 0;
-int32_t ir_avg_reg = 0;
-
-int16_t cbuf[32] = {0};
-uint8_t offset = 0;
-
-static const uint16_t FIRCoeffs[12] = {172, 321, 579, 927, 1360, 1858, 2390, 2916, 3391, 3768, 4012, 4096};
-
-//Determines the DC so it can subtracted from the sample
-int16_t averageDCEstimator(int32_t *p, int32_t x) {
-    *p += (((x << 15) - *p) >> 4);
-    return (*p >> 15);
+    //test
+    gpio_set_function(22, GPIO_FUNC_SIO);
+    gpio_init(22);
+    gpio_set_dir(22, 1);
+    gpio_put(22, 1);
 }
 
-int32_t mul16(int16_t x, int16_t y) {
-    return ((int32_t)x * (int32_t)y);
-}
+void MAX30205_check_address()
+{
+    printf("scanning I2C bus for MAX30205...\n"); fflush(stdout);
 
-int16_t lowPassFIRFilter(int16_t din) {
-    cbuf[offset] = din;
-
-    int32_t z = mul16(FIRCoeffs[11], cbuf[(offset - 11) & 0x1F]);
-    //convolution
-    for (uint8_t i = 0; i < 11; i++) {
-        z += mul16(FIRCoeffs[i], cbuf[(offset - i) & 0x1F] + cbuf[(offset - 22 + i) & 0x1F]);
-    }
-
-    offset = (offset + 1) & 0x1F;
-    return (int16_t)(z >> 15);
-}
-
-// Returns true if a heartbeat is detected
-bool checkForBeat(int32_t sample) {
-    bool beatDetected = false;
-
-    IR_AC_Signal_Previous = IR_AC_Signal_Current;
-
-    IR_Average_Estimated = averageDCEstimator(&ir_avg_reg, sample);
-    IR_AC_Signal_Current = lowPassFIRFilter(sample - IR_Average_Estimated);
-
-    // Positive zero crossing
-    if ((IR_AC_Signal_Previous < 0) && (IR_AC_Signal_Current >= 0)) {
-        IR_AC_Max = IR_AC_Signal_max;
-        IR_AC_Min = IR_AC_Signal_min;
-
-        positiveEdge = 1;
-        negativeEdge = 0;
-        IR_AC_Signal_max = 0;
-
-        if ((IR_AC_Max - IR_AC_Min) > 20 && (IR_AC_Max - IR_AC_Min) < 1000) {
-            beatDetected = true;
+    printf("   0 1 2 3 4 5 6 7 8 9 A B C D E F\n");fflush(stdout);
+    for (int addr = 0; addr < (1 << 7); ++addr) {
+        //printf("Scanning %d", addr); fflush(stdout);
+        if (addr % 16 == 0) {
+            printf("%02x ", addr);
         }
-    }
 
-    // Negative zero crossing
-    if ((IR_AC_Signal_Previous > 0) && (IR_AC_Signal_Current <= 0)) {
-        positiveEdge = 0;
-        negativeEdge = 1;
-        IR_AC_Signal_min = 0;
-    }
+        int ret;
+        uint8_t rxdata;
+        uint8_t txdata=0;
+        i2c_write_blocking(i2c0, addr, &txdata, 1, true);
+        ret = i2c_read_blocking(i2c0, addr, &rxdata, 1, false);
 
-    // Track max in positive cycle
-    if (positiveEdge && IR_AC_Signal_Current > IR_AC_Signal_Previous) {
-        IR_AC_Signal_max = IR_AC_Signal_Current;
-    }
-
-    // Track min in negative cycle
-    if (negativeEdge && IR_AC_Signal_Current < IR_AC_Signal_Previous) {
-        IR_AC_Signal_min = IR_AC_Signal_Current;
-    }
-
-    return beatDetected;
-}
-
-void init_i2c() {
-    i2c_init(i2c0, 400 * 1000); 
-    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
-    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
-}
-
-void max30102_init() {
-    uint8_t fifo_cfg[] = {0x08, 0x04};
-    i2c_write_blocking(i2c0, SENSOR_ADDRESS, fifo_cfg, 2, false);
-
-    uint8_t mode_cfg[] = {0x09, 0x02};
-    i2c_write_blocking(i2c0, SENSOR_ADDRESS, mode_cfg, 2, false);
-
-    uint8_t spo2_cfg[] = {0x0A, 0x27};
-    i2c_write_blocking(i2c0, SENSOR_ADDRESS, spo2_cfg, 2, false);
-
-    uint8_t led_cfg[] = {0x0C, 0x24};
-    i2c_write_blocking(i2c0, SENSOR_ADDRESS, led_cfg, 2, false);
-}
-
-uint64_t last_peak = 0;
-double intervals[8] = {0};
-int int_count = 0;
-int int_i = 0;
-
-uint64_t total_bpm_sum = 0;
-uint32_t total_beats = 0;
-
-void max30102_read_red() {
-    hw_clear_bits(&timer1_hw->intr, 1u << 0);
-    uint8_t reg = 0x07;
-    uint8_t raw[3];
-
-    i2c_write_blocking(i2c0, SENSOR_ADDRESS, &reg, 1, true);
-    i2c_read_blocking(i2c0, SENSOR_ADDRESS, raw, 3, false);
-
-    sample = ((raw[0] << 16) | (raw[1] << 8) | raw[2]) & 0x3FFFF;
-
-    if (checkForBeat(sample)) {
-        uint64_t now = time_us_64();
-        if (last_peak != 0) {
-            double dt = (now - last_peak) / 1e6; // seconds
-            double bpm = 60.0 / dt;
-
-            // Add to sum and increment beat count
-            total_bpm_sum += bpm;
-            total_beats++;
-
-            // Display the average of all BPMs so far
-            heart_rate = (uint32_t)(total_bpm_sum / total_beats);
+        if (ret<0)
+        {
+            printf(".");fflush(stdout);
+        } else
+        {
+            printf("@");fflush(stdout);
         }
-        last_peak = now;
+        printf(addr % 16 == 15 ? "\n" : " ");fflush(stdout);
     }
-    if(sample < 10000){
-        total_bpm_sum = 0;
-        total_beats = 0;
-        heart_rate = 0;
-    }
-    // printf("Sample: %lu ---- BPM: %lu\n", sample, heart_rate);
-    timer1_hw->alarm[0] = (uint32_t)timer1_hw->timerawl + 15000;
-
+    printf("Done\n");fflush(stdout);
 }
 
-void timer_irq() {
-    hw_set_bits(&timer1_hw->inte, 1u << 0);
-    irq_set_exclusive_handler(timer_hardware_alarm_get_irq_num(timer1_hw, 0), max30102_read_red);
-    irq_set_enabled(timer_hardware_alarm_get_irq_num(timer1_hw, 0), true);
-    //uint64_t next = timer1_hw->timerawl + 10000;   // 100 Hz
-    timer1_hw->alarm[0] = (uint32_t)timer1_hw->timerawl + 15000;
+void read_temperature()
+{
+    hw_clear_bits(&timer0_hw->intr, 1u << 0); // acknowledge timer
+
+    int addr = 0x48;
+    uint8_t txdata = 0;
+    uint8_t buf[2];
+    i2c_write_blocking(i2c0, addr, &txdata, 1, true);
+    i2c_read_blocking(i2c0, addr, buf, 2, false);
+
+    uint16_t raw_data = (uint16_t) (buf[0] << 8 | buf[1]);
+    int signed_raw = (int16_t) raw_data;
+    temperature = signed_raw * 0.00390625f + 64.0f;
+
+    uint64_t quat_s = timer0_hw->timerawl + 250000;
+    timer0_hw->alarm[0] = (uint32_t) quat_s;
 }
 
-int main() {
-    stdio_init_all();
-    sleep_ms(2000);
-
-    init_i2c();
-    max30102_init();
-
-    printf("MAX30102 Initialized.\n");
-    timer_irq();
-    while (1) {
-        //max30102_read_red();
-        printf("Sample: %lu ---- BPM: %lu\n", sample, heart_rate);
-        //sleep_ms(10);
-    }
-
-    return 0;
+void MAX30205_init_timer()
+{
+    hw_set_bits(&timer0_hw->inte, 1u << 0); // interrupt enable for timer0 alarm0
+    irq_set_exclusive_handler(timer_hardware_alarm_get_irq_num(timer0_hw, 0), read_temperature);
+    irq_set_enabled(timer_hardware_alarm_get_irq_num(timer0_hw, 0), true);
+    uint64_t s1 = timer0_hw->timerawl + 1000000;
+    timer0_hw->alarm[0] = (uint32_t) s1;
 }
