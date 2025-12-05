@@ -1,11 +1,11 @@
-#include "MAX30102.h"
+#include "max30102.h"
 #include <stdbool.h>
 #include <stdint.h>
 
 const int I2C_SDA = 32;
 const int I2C_SCL = 33; 
 const uint8_t SENSOR_ADDRESS = 0x57;
-uint32_t heart_rate = 0;
+
 uint32_t sample = 0;
 
 // PBA algorithm variables
@@ -122,6 +122,7 @@ uint64_t total_bpm_sum = 0;
 uint32_t total_beats = 0;
 
 void max30102_read_red() {
+    hw_clear_bits(&timer1_hw->intr, 1u << 0);
     uint8_t reg = 0x07;
     uint8_t raw[3];
 
@@ -150,9 +151,19 @@ void max30102_read_red() {
         total_beats = 0;
         heart_rate = 0;
     }
+    // printf("Sample: %lu ---- BPM: %lu\n", sample, heart_rate);
+    timer1_hw->alarm[0] = (uint32_t)timer1_hw->timerawl + 15000;
+
 }
 
-/*
+void timer_irq() {
+    hw_set_bits(&timer1_hw->inte, 1u << 0);
+    irq_set_exclusive_handler(timer_hardware_alarm_get_irq_num(timer1_hw, 0), max30102_read_red);
+    irq_set_enabled(timer_hardware_alarm_get_irq_num(timer1_hw, 0), true);
+    //uint64_t next = timer1_hw->timerawl + 10000;   // 100 Hz
+    timer1_hw->alarm[0] = (uint32_t)timer1_hw->timerawl + 15000;
+}
+
 int main() {
     stdio_init_all();
     sleep_ms(2000);
@@ -161,14 +172,12 @@ int main() {
     max30102_init();
 
     printf("MAX30102 Initialized.\n");
-
+    timer_irq();
     while (1) {
-        max30102_read_red();
+        //max30102_read_red();
         printf("Sample: %lu ---- BPM: %lu\n", sample, heart_rate);
-        sleep_ms(10);
+        //sleep_ms(10);
     }
 
     return 0;
 }
-*/
-
